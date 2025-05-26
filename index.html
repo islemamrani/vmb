@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disability helper project</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom CSS for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .btn-pink {
+            background-color: #ff69b4; /* Hot pink */
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex; /* Use flex to center content */
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem; /* Space between text and spinner */
+        }
+        .btn-pink:hover {
+            background-color: #e05cb0; /* Slightly darker pink */
+            transform: translateY(-1px);
+        }
+        .btn-pink:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .btn-pink:disabled {
+            background-color: #fca5d2; /* Lighter pink for disabled */
+            cursor: not-allowed;
+            opacity: 0.7;
+            box-shadow: none;
+        }
+        /* Specific style for the "Stop Listening" state of the button */
+        .btn-pink.listening {
+            background-color: #dc3545; /* Red for stopping */
+        }
+        .btn-pink.listening:hover {
+            background-color: #b02a37; /* Darker red */
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 700px;
+        }
+        textarea, select, input[type="text"] {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            width: 100%;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        textarea:focus, select:focus, input[type="text"]:focus {
+            border-color: #ff69b4;
+            box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.2);
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ff69b4;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Style for the speech output area */
+        #speechOutput {
+            width: 100%;
+            min-height: 150px;
+            padding: 15px;
+            background-color: #f8fafc;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            color: #334155;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+        }
+        #speechOutput i {
+            color: #94a3b8; /* Gray for interim results */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100 text-gray-800 flex flex-col items-center p-4">
+
+    <header class="text-center my-8">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-pink-600 mb-2">
+            This project was made for improving people's productivity and to make lives easier.
+        </h1>
+        <p class="text-xl text-gray-600">Your all-in-one tool for lectures and text processing.</p>
+    </header>
+
+    <section class="card">
+        <h2 class="text-2xl font-bold text-gray-700 mb-4">🎤 Lecture Transcription (Voice to Text)</h2>
+        <div id="speechOutput" class="text-gray-800">Input lecture speech..</div>
+        <div class="flex flex-col sm:flex-row gap-4">
+            <button id="toggleListeningBtn" class="btn-pink flex-1">
+                Start Listening
+            </button>
+            <button id="downloadTranscribedTextBtn" class="btn-pink flex-1" disabled>
+                Download Transcribed Text
+            </button>
+        </div>
+        <p id="speechStatus" class="text-sm text-gray-600 mt-4"></p>
+        <p class="text-xs text-gray-500 mt-2">
+            This feature uses your browser's built-in speech recognition. Microphone access is required.
+        </p>
+    </section>
+
+    <section class="card">
+        <h2 class="text-2xl font-bold text-gray-700 mb-4">📝 Text Summarizer</h2>
+        <textarea
+            id="summaryInput"
+            placeholder="Paste text here to summarize..."
+            rows="8"
+            class="mb-4"
+        ></textarea>
+        <p id="summaryError" class="text-red-500 text-sm mb-2"></p>
+        <button id="summarizeButton" class="btn-pink w-full mb-4">
+            Summarize Text
+            <span id="summarizingSpinner" class="loading-spinner hidden"></span>
+        </button>
+        <div id="summarizedTextContainer" class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg hidden">
+            <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
+            <p id="summarizedText" class="whitespace-pre-wrap text-gray-800"></p>
+            <button id="downloadSummaryButton" class="btn-pink mt-4 w-full">
+                Download Summary
+            </button>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="text-2xl font-bold text-gray-700 mb-4">🌐 Language Translator</h2>
+        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <div class="flex-1">
+                <label for="source-lang" class="block text-sm font-medium text-gray-700 mb-1">Source Language:</label>
+                <select id="sourceLang" class="w-full">
+                    </select>
+            </div>
+            <div class="flex-1">
+                <label for="target-lang" class="block text-sm font-medium text-gray-700 mb-1">Target Language:</label>
+                <select id="targetLang" class="w-full">
+                    </select>
+            </div>
+        </div>
+        <textarea
+            id="translateInput"
+            placeholder="Enter text to translate..."
+            rows="8"
+            class="mb-4"
+        ></textarea>
+        <p id="translateError" class="text-red-500 text-sm mb-2"></p>
+        <button id="translateButton" class="btn-pink w-full mb-4">
+            Translate Text
+            <span id="translatingSpinner" class="loading-spinner hidden"></span>
+        </button>
+        <div id="translatedTextContainer" class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg hidden">
+            <h3 class="font-semibold text-gray-700 mb-2">Translation:</h3>
+            <p id="translatedText" class="whitespace-pre-wrap text-gray-800"></p>
+            <button id="downloadTranslationButton" class="btn-pink mt-4 w-full">
+                Download Translation
+            </button>
+        </div>
+    </section>
+
+    <footer class="text-center mt-8 text-gray-600 text-sm">
+        <p>Made by Narjes, Natalia, Kayla, Sia, Anna</p>
+    </footer>
+
+    <script>
+        // --- Global Variables / State ---
+        let isListening = false;
+        let recognition; // Web Speech API Recognition object
+        let finalTranscriptContent = ''; // Stores the full transcribed text
+
+        let isSummarizing = false;
+        let isTranslating = false;
+        let isLoading = false; // General loading state for API calls
+
+        // Available languages for translation (ISO 639-1 codes)
+        // These are common codes supported by the unofficial Google Translate endpoint
+        const languages = [
+            { code: 'en', name: 'English' },
+            { code: 'es', name: 'Spanish' },
+            { code: 'fr', name: 'French' },
+            { code: 'de', name: 'German' },
+            { code: 'zh-CN', name: 'Chinese (Simplified)' }, // Use 'zh-CN' for this endpoint
+            { code: 'ja', name: 'Japanese' },
+            { code: 'ar', name: 'Arabic' },
+            { code: 'pt', name: 'Portuguese' },
+            { code: 'ru', name: 'Russian' },
+            { code: 'it', name: 'Italian' },
+            { code: 'ko', name: 'Korean' },
+            { code: 'af', name: 'Afrikaans' },
+            { code: 'sq', name: 'Albanian' },
+            { code: 'am', name: 'Amharic' },
+            { code: 'hy', name: 'Armenian' },
+            { code: 'az', name: 'Azerbaijani' },
+            { code: 'eu', name: 'Basque' },
+            { code: 'be', name: 'Belarusian' },
+            { code: 'bn', name: 'Bengali' },
+            { code: 'bs', name: 'Bosnian' },
+            { code: 'bg', name: 'Bulgarian' },
+            { code: 'ca', name: 'Catalan' },
+            { code: 'ceb', name: 'Cebuano' },
+            { code: 'ny', name: 'Chichewa' },
+            { code: 'hr', name: 'Croatian' },
+            { code: 'cs', name: 'Czech' },
+            { code: 'da', name: 'Danish' },
+            { code: 'nl', name: 'Dutch' },
+            { code: 'eo', name: 'Esperanto' },
+            { code: 'et', name: 'Estonian' },
+            { code: 'tl', name: 'Filipino' },
+            { code: 'fi', name: 'Finnish' },
+            { code: 'gl', name: 'Galician' },
+            { code: 'ka', name: 'Georgian' },
+            { code: 'el', name: 'Greek' },
+            { code: 'gu', name: 'Gujarati' },
+            { code: 'ht', name: 'Haitian Creole' },
+            { code: 'ha', name: 'Hausa' },
+            { code: 'iw', name: 'Hebrew' },
+            { code: 'hi', name: 'Hindi' },
+            { code: 'hmn', name: 'Hmong' },
+            { code: 'hu', name: 'Hungarian' },
+            { code: 'is', name: 'Icelandic' },
+            { code: 'ig', name: 'Igbo' },
+            { code: 'id', name: 'Indonesian' },
+            { code: 'ga', name: 'Irish' },
+            { code: 'jw', name: 'Javanese' },
+            { code: 'kn', name: 'Kannada' },
+            { code: 'kk', name: 'Kazakh' },
+            { code: 'km', name: 'Khmer' },
+            { code: 'rw', name: 'Kinyarwanda' },
+            { code: 'ky', name: 'Kyrgyz' },
+            { code: 'lo', name: 'Lao' },
+            { code: 'la', name: 'Latin' },
+            { code: 'lv', name: 'Latvian' },
+            { code: 'lt', name: 'Lithuanian' },
+            { code: 'lb', name: 'Luxembourgish' },
+            { code: 'mk', name: 'Macedonian' },
+            { code: 'mg', name: 'Malagasy' },
+            { code: 'ms', name: 'Malay' },
+            { code: 'ml', name: 'Malayalam' },
+            { code: 'mt', name: 'Maltese' },
+            { code: 'mi', name: 'Maori' },
+            { code: 'mr', name: 'Marathi' },
+            { code: 'mn', name: 'Mongolian' },
+            { code: 'my', name: 'Myanmar (Burmese)' },
+            { code: 'ne', name: 'Nepali' },
+            { code: 'no', name: 'Norwegian' },
+            { code: 'or', name: 'Odia (Oriya)' },
+            { code: 'ps', name: 'Pashto' },
+            { code: 'fa', name: 'Persian' },
+            { code: 'pl', name: 'Polish' },
+            { code: 'pa', name: 'Punjabi' },
+            { code: 'ro', name: 'Romanian' },
+            { code: 'sm', name: 'Samoan' },
+            { code: 'gd', name: 'Scottish Gaelic' },
+            { code: 'sr', name: 'Serbian' },
+            { code: 'st', name: 'Sesotho' },
+            { code: 'sn', name: 'Shona' },
+            { code: 'sd', name: 'Sindhi' },
+            { code: 'si', name: 'Sinhala' },
+            { code: 'sk', name: 'Slovak' },
+            { code: 'sl', name: 'Slovenian' },
+            { code: 'so', name: 'Somali' },
+            { code: 'su', name: 'Sundanese' },
+            { code: 'sw', name: 'Swahili' },
+            { code: 'sv', name: 'Swedish' },
+            { code: 'tg', name: 'Tajik' },
+            { code: 'ta', name: 'Tamil' },
+            { code: 'tt', name: 'Tatar' },
+            { code: 'te', name: 'Telugu' },
+            { code: 'th', name: 'Thai' },
+            { code: 'tr', name: 'Turkish' },
+            { code: 'tk', name: 'Turkmen' },
+            { code: 'uk', name: 'Ukrainian' },
+            { code: 'ur', name: 'Urdu' },
+            { code: 'ug', name: 'Uyghur' },
+            { code: 'uz', name: 'Uzbek' },
+            { code: 'vi', name: 'Vietnamese' },
+            { code: 'cy', name: 'Welsh' },
+            { code: 'xh', name: 'Xhosa' },
+            { code: 'yi', name: 'Yiddish' },
+            { code: 'yo', name: 'Yoruba' },
+            { code: 'zu', name: 'Zulu' }
+        ];
+
+        // --- DOM Element References ---
+        const toggleListeningBtn = document.getElementById('toggleListeningBtn');
+        const speechOutputElem = document.getElementById('speechOutput');
+        const speechStatusElem = document.getElementById('speechStatus');
+        const downloadTranscribedTextBtn = document.getElementById('downloadTranscribedTextBtn');
+
+        const summaryInput = document.getElementById('summaryInput');
+        const summarizeButton = document.getElementById('summarizeButton');
+        const summarizingSpinner = document.getElementById('summarizingSpinner');
+        const summarizedTextContainer = document.getElementById('summarizedTextContainer');
+        const summarizedTextElem = document.getElementById('summarizedText');
+        const downloadSummaryButton = document.getElementById('downloadSummaryButton');
+        const summaryErrorElem = document.getElementById('summaryError');
+
+        const sourceLangSelect = document.getElementById('sourceLang');
+        const targetLangSelect = document.getElementById('targetLang');
+        const translateInput = document.getElementById('translateInput');
+        const translateButton = document.getElementById('translateButton');
+        const translatingSpinner = document.getElementById('translatingSpinner');
+        const translatedTextContainer = document.getElementById('translatedTextContainer');
+        const translatedTextElem = document.getElementById('translatedText');
+        const downloadTranslationButton = document.getElementById('downloadTranslationButton');
+        const translateErrorElem = document.getElementById('translateError');
+
+        // --- Helper Functions ---
+
+        /**
+         * Downloads a given text string as a file.
+         * @param {string} text - The text content to download.
+         * @param {string} filename - The name of the file to be downloaded.
+         */
+        const downloadTextFile = (text, filename) => {
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        /**
+         * Updates the disabled state of buttons and spinner visibility.
+         */
+        const updateButtonStates = () => {
+            toggleListeningBtn.disabled = isLoading;
+            downloadTranscribedTextBtn.disabled = isLoading || !finalTranscriptContent; // Only enable if there's text
+
+            summarizeButton.disabled = isSummarizing || isLoading;
+            translateButton.disabled = isTranslating || isLoading;
+
+            // Show/hide spinners
+            summarizingSpinner.classList.toggle('hidden', !isSummarizing);
+            translatingSpinner.classList.toggle('hidden', !isTranslating);
+
+            // Toggle "listening" class for the record button
+            toggleListeningBtn.classList.toggle('listening', isListening);
+            toggleListeningBtn.textContent = isListening ? 'Stop Listening' : 'Start Listening';
+        };
+
+        /**
+         * Sets the general loading state and updates button states.
+         * @param {boolean} loadingState - True to set loading, false to unset.
+         */
+        const setLoading = (loadingState) => {
+            isLoading = loadingState;
+            updateButtonStates();
+        };
+
+        // --- Speech Recognition Functions ---
+
+        // Check for Web Speech API support
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = true;       // Keep listening even if user pauses
+            recognition.interimResults = true;   // Show live, interim results
+            recognition.lang = 'en-US';          // Default language
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                finalTranscriptContent = ''; // Reset for final transcript
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscriptContent += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                speechOutputElem.innerHTML = finalTranscriptContent + '<i style="color: gray;">' + interimTranscript + '</i>';
+                downloadTranscribedTextBtn.disabled = !finalTranscriptContent; // Enable download button
+            };
+
+            recognition.onerror = function(event) {
+                let errorMessage = '';
+                switch (event.error) {
+                    case 'no-speech':
+                        errorMessage = 'No speech detected. Please try speaking again.';
+                        break;
+                    case 'audio-capture':
+                        errorMessage = 'Microphone not detected. Ensure your microphone is connected and enabled.';
+                        break;
+                    case 'not-allowed':
+                        errorMessage = 'Microphone access denied. Please allow access in browser settings.';
+                        break;
+                    case 'service-not-allowed':
+                        errorMessage = 'Speech recognition service not allowed. Check browser permissions.';
+                        break;
+                    case 'network':
+                        errorMessage = 'Network error. Please check your internet connection.';
+                        break;
+                    default:
+                        errorMessage = `Speech recognition error: ${event.error}`;
+                }
+                speechStatusElem.textContent = 'Error: ' + errorMessage;
+                console.error('Speech recognition error:', event.error);
+                stopRecognition(); // Stop if there's an error
+            };
+
+            recognition.onend = function() {
+                if (isListening) {
+                    // If still meant to be listening, restart recognition (e.g., after a pause)
+                    try {
+                        recognition.start();
+                        speechStatusElem.textContent = 'Listening (restarted)...';
+                    } catch (error) {
+                        speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
+                        console.error('Error restarting recognition:', error);
+                        stopRecognition();
+                    }
+                } else {
+                    speechStatusElem.textContent = 'Speech recognition stopped.';
+                    updateButtonStates();
+                }
+            };
+
+            const startRecognition = () => {
+                isListening = true;
+                speechStatusElem.textContent = 'Listening...';
+                speechOutputElem.textContent = 'Listening...'; // Clear previous text
+                finalTranscriptContent = ''; // Clear stored content
+                updateButtonStates();
+                try {
+                    recognition.start();
+                } catch (error) {
+                    speechStatusElem.textContent = 'Error starting recognition: ' + error.message;
+                    console.error('Error starting recognition:', error);
+                    stopRecognition();
+                }
+            };
+
+            const stopRecognition = () => {
+                isListening = false;
+                if (recognition) {
+                    recognition.stop(); // This will trigger onend event
+                }
+                speechStatusElem.textContent = 'Ready to listen.';
+                updateButtonStates();
+            };
+
+            toggleListeningBtn.addEventListener('click', function() {
+                if (isListening) {
+                    stopRecognition();
+                } else {
+                    // Request microphone permission explicitly before starting recognition
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(() => {
+                            startRecognition();
+                        })
+                        .catch(err => {
+                            speechStatusElem.textContent = 'Microphone access denied. Please allow microphone access in your browser settings.';
+                            console.error('Microphone access error:', err);
+                            // Disable button if permission denied
+                            toggleListeningBtn.disabled = true;
+                        });
+                }
+            });
+
+            downloadTranscribedTextBtn.addEventListener('click', function() {
+                if (finalTranscriptContent) {
+                    downloadTextFile(finalTranscriptContent, `lecture_transcription_${new Date().toISOString()}.txt`);
+                    speechStatusElem.textContent = 'Transcribed text downloaded!';
+                } else {
+                    speechStatusElem.textContent = 'No text to download.';
+                }
+            });
+
+        } else {
+            speechOutputElem.textContent = 'Sorry, your browser does not support the Web Speech API.';
+            toggleListeningBtn.disabled = true;
+            speechStatusElem.textContent = 'Browser not supported.';
+        }
+
+
+        // --- Text Summarizer Functions ---
+
+        const summarizeText = async () => {
+            const textToSummarize = summaryInput.value.trim();
+            if (!textToSummarize) {
+                summaryErrorElem.textContent = 'Please enter text to summarize.';
+                return;
+            }
+            isSummarizing = true;
+            summaryErrorElem.textContent = '';
+            summarizedTextElem.textContent = '';
+            summarizedTextContainer.classList.add('hidden');
+            setLoading(true);
+
+            try {
+                const prompt = `Summarize the following text concisely and accurately:\n\n${textToSummarize}`;
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                // In Canvas, the API key for Gemini is automatically provided when empty.
+                // If deploying outside Canvas, replace "" with your actual Gemini API key.
+                const apiKey = "AIzaSyAca1epswMV8zPug9iHKP1cmbL7rzHENbE"; 
+
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    summarizedTextElem.textContent = text;
+                    summarizedTextContainer.classList.remove('hidden');
+                } else {
+                    summaryErrorElem.textContent = 'Failed to get a summary. Please try again.';
+                    console.error('Unexpected API response structure for summarization:', result);
+                }
+            } catch (error) {
+                console.error('Error summarizing text:', error);
+                summaryErrorElem.textContent = 'An error occurred while summarizing. Please try again.';
+            } finally {
+                isSummarizing = false;
+                setLoading(false);
+            }
+        };
+
+        const downloadSummarizedText = () => {
+            if (summarizedTextElem.textContent) {
+                downloadTextFile(summarizedTextElem.textContent, `summary_${new Date().toISOString()}.txt`);
+            } else {
+                summaryErrorElem.textContent = 'No summary to download.';
+            }
+        };
+
+        // --- Language Translator Functions ---
+
+        const populateLanguageSelects = () => {
+            sourceLangSelect.innerHTML = '';
+            targetLangSelect.innerHTML = '';
+            languages.forEach(lang => {
+                const optionSource = document.createElement('option');
+                optionSource.value = lang.code;
+                optionSource.textContent = lang.name;
+                sourceLangSelect.appendChild(optionSource);
+
+                const optionTarget = document.createElement('option');
+                optionTarget.value = lang.code;
+                optionTarget.textContent = lang.name;
+                targetLangSelect.appendChild(optionTarget);
+            });
+            // Set default selections
+            sourceLangSelect.value = 'en';
+            targetLangSelect.value = 'es';
+        };
+
+        const translateText = async () => {
+            const textToTranslate = translateInput.value.trim();
+            const sourceCode = sourceLangSelect.value;
+            const targetCode = targetLangSelect.value;
+
+            if (!textToTranslate) {
+                translateErrorElem.textContent = 'Please enter text to translate.';
+                return;
+            }
+            if (sourceCode === targetCode) {
+                translateErrorElem.textContent = 'Source and target languages cannot be the same.';
+                return;
+            }
+
+            isTranslating = true;
+            translateErrorElem.textContent = '';
+            translatedTextElem.textContent = '';
+            translatedTextContainer.classList.add('hidden');
+            setLoading(true);
+
+            try {
+                // Using an unofficial, free Google Translate endpoint (not guaranteed for production)
+                // This endpoint does not require an API key.
+                const encodedText = encodeURIComponent(textToTranslate);
+                const apiUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceCode}&tl=${targetCode}&dt=t&q=${encodedText}`;
+
+                const response = await fetch(apiUrl);
+
+                // Check if the response is OK (status 200)
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // The structure of the response from this unofficial API is an array of arrays
+                // The translated text is usually in result[0][0][0]
+                if (result && result[0] && result[0][0] && result[0][0][0]) {
+                    const translatedText = result[0][0][0];
+                    translatedTextElem.textContent = translatedText;
+                    translatedTextContainer.classList.remove('hidden');
+                } else {
+                    translateErrorElem.textContent = 'Failed to get a translation. Unexpected response format.';
+                    console.error('Unexpected API response structure for translation:', result);
+                }
+            } catch (error) {
+                console.error('Error translating text:', error);
+                translateErrorElem.textContent = `An error occurred while translating: ${error.message}. This free service may be unstable.`;
+            } finally {
+                isTranslating = false;
+                setLoading(false);
+            }
+        };
+
+        const downloadTranslatedText = () => {
+            if (translatedTextElem.textContent) {
+                downloadTextFile(translatedTextElem.textContent, `translation_${new Date().toISOString()}.txt`);
+            } else {
+                translateErrorElem.textContent = 'No translation to download.';
+            }
+        };
+
+        // --- Initial Setup (runs when the page loads) ---
+        window.onload = function() {
+            populateLanguageSelects();
+            updateButtonStates(); // Set initial button states
+
+            // Event listeners for Summarizer
+            summaryInput.addEventListener('input', () => summaryErrorElem.textContent = '');
+            summarizeButton.addEventListener('click', summarizeText);
+            downloadSummaryButton.addEventListener('click', downloadSummarizedText);
+
+            // Event listeners for Translator
+            translateInput.addEventListener('input', () => translateErrorElem.textContent = '');
+            sourceLangSelect.addEventListener('change', () => translateErrorElem.textContent = '');
+            targetLangSelect.addEventListener('change', () => translateErrorElem.textContent = '');
+            translateButton.addEventListener('click', translateText);
+            downloadTranslationButton.addEventListener('click', downloadTranslatedText);
+        };
+    </script>
+</body>
+</html>
