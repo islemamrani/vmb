@@ -401,17 +401,23 @@
 
             recognition.onresult = function(event) {
                 let interimTranscript = '';
-                finalTranscriptContent = '';
+                let sessionFinalTranscript = '';
 
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
                     if (event.results[i].isFinal) {
-                        finalTranscriptContent += transcript + ' ';
+                        sessionFinalTranscript += transcript + ' ';
                     } else {
                         interimTranscript += transcript;
                     }
                 }
 
+                // Append new final transcript to the accumulated content
+                if (sessionFinalTranscript) {
+                    finalTranscriptContent += sessionFinalTranscript;
+                }
+
+                // Update display with all final content plus interim results
                 speechOutputElem.innerHTML = finalTranscriptContent + '<i style="color: gray;">' + interimTranscript + '</i>';
                 downloadTranscribedTextBtn.disabled = !finalTranscriptContent;
             };
@@ -495,9 +501,14 @@
 
             function startRecognition() {
                 isListening = true;
-                speechOutputElem.textContent = 'Listening...';
+                // Do not clear existing text; append a newline if there's content
+                if (finalTranscriptContent) {
+                    finalTranscriptContent += '\n';
+                    speechOutputElem.innerHTML = finalTranscriptContent;
+                } else {
+                    speechOutputElem.textContent = '';
+                }
                 speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
-                finalTranscriptContent = '';
                 updateButtonStates();
                 try {
                     recognition.start();
