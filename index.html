@@ -139,7 +139,7 @@
         </div>
         <p id="speechStatus" class="text-sm text-gray-600 mt-4"></p>
         <p class="text-xs text-gray-500 mt-2">
-            This feature uses your browser's built-in speech recognition. Microphone access is required.
+            This feature uses your browser's built-in speech recognition. Microphone access is required. For best results, use Chrome or Edge.
         </p>
     </section>
 
@@ -220,7 +220,7 @@
             { code: 'es', name: 'Spanish' },
             { code: 'fr', name: 'French' },
             { code: 'de', name: 'German' },
-            { code: 'zh-CN', name: 'Chinese (Simplified)' }, // Use 'zh-CN' for this endpoint
+            { code: 'zh-CN', name: 'Chinese (Simplified)' },
             { code: 'ja', name: 'Japanese' },
             { code: 'ar', name: 'Arabic' },
             { code: 'pt', name: 'Portuguese' },
@@ -397,19 +397,65 @@
         // --- Speech Recognition Functions ---
 
         // Check for Web Speech API support
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.continuous = true;       // Keep listening even if user pauses
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;       // Keep listening until stopped
             recognition.interimResults = true;   // Show live, interim results
             recognition.lang = speechLangSelect.value; // Set initial language from dropdown
 
-            // Update language when selection changes
-            speechLangSelect.addEventListener('change', () => {
+            // Initialize recognition with current language
+            const initializeRecognition = () => {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
                 recognition.lang = speechLangSelect.value;
-                if (isListening) {
-                    // Restart recognition with new language
-                    recognition.stop();
-                    setTimeout(() => {
+
+                recognition.onresult = function(event) {
+                    let interimTranscript = '';
+                    finalTranscriptContent = ''; // Reset for final transcript
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscriptContent += transcript + ' ';
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    speechOutputElem.innerHTML = finalTranscriptContent + '<i style="color: gray;">' + interimTranscript + '</i>';
+                    downloadTranscribedTextBtn.disabled = !finalTranscriptContent; // Enable download button
+                };
+
+                recognition.onerror = function(event) {
+                    let errorMessage = '';
+                    switch (event.error) {
+                        case 'no-speech':
+                            errorMessage = 'No speech detected. Please try speaking again.';
+                            break;
+                        case 'audio-capture':
+                            errorMessage = 'Microphone not detected. Ensure your microphone is connected.';
+                            break;
+                        case 'not-allowed':
+                            errorMessage = 'Microphone access denied. Please allow access in browser settings.';
+                            break;
+                        case 'service-not-allowed':
+                            errorMessage = 'Speech recognition service not allowed. Check browser permissions.';
+                            break;
+                        case 'network':
+                            errorMessage = 'Network error. Please check your internet connection.';
+                            break;
+                        default:
+                            errorMessage = `Speech recognition error: ${event.error}`;
+                    }
+                    speechStatusElem.textContent = 'Error: ' + errorMessage;
+                    console.error('Speech recognition error:', event.error);
+                    stopRecognition();
+                };
+
+                recognition.onend = function() {
+                    if (isListening) {
+                        // Restart recognition if still meant to be listening
                         try {
                             recognition.start();
                             speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
@@ -418,76 +464,42 @@
                             console.error('Error restarting recognition:', error);
                             stopRecognition();
                         }
-                    }, 200); // Small delay to ensure stop completes
+                    } else {
+                        speechStatusElem.textContent = 'Speech recognition stopped.';
+                        updateButtonStates();
+                    }
+                };
+            };
+
+            // Update language when selection changes
+            speechLangSelect.addEventListener('change', () => {
+                if (isListening) {
+                    recognition.stop();
+                    setTimeout(() => {
+                        initializeRecognition();
+                        try {
+                            recognition.start();
+                            speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
+                        } catch (error) {
+                            speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
+                            console.error('Error restarting recognition:', error);
+                            stopRecognition();
+                        }
+                    }, 200); // Delay to ensure stop completes
+                } else {
+                    recognition.lang = speechLangSelect.value;
+                    speechStatusElem.textContent = `Language set to ${speechLangSelect.options[speechLangSelect.selectedIndex].text}`;
                 }
             });
-
-            recognition.onresult = function(event) {
-                let interimTranscript = '';
-                finalTranscriptContent = ''; // Reset for final transcript
-
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscriptContent += transcript + ' ';
-                    } else {
-                        interimTranscript += transcript;
-                    }
-                }
-                speechOutputElem.innerHTML = finalTranscriptContent + '<i style="color: gray;">' + interimTranscript + '</i>';
-                downloadTranscribedTextBtn.disabled = !finalTranscriptContent; // Enable download button
-            };
-
-            recognition.onerror = function(event) {
-                let errorMessage = '';
-                switch (event.error) {
-                    case 'no-speech':
-                        errorMessage = 'No speech detected. Please try speaking again.';
-                        break;
-                    case 'audio-capture':
-                        errorMessage = 'Microphone not detected. Ensure your microphone is connected and enabled.';
-                        break;
-                    case 'not-allowed':
-                        errorMessage = 'Microphone access denied. Please allow access in browser settings.';
-                        break;
-                    case 'service-not-allowed':
-                        errorMessage = 'Speech recognition service not allowed. Check browser permissions.';
-                        break;
-                    case 'network':
-                        errorMessage = 'Network error. Please check your internet connection.';
-                        break;
-                    default:
-                        errorMessage = `Speech recognition error: ${event.error}`;
-                }
-                speechStatusElem.textContent = 'Error: ' + errorMessage;
-                console.error('Speech recognition error:', event.error);
-                stopRecognition(); // Stop if there's an error
-            };
-
-            recognition.onend = function() {
-                if (isListening) {
-                    // If still meant to be listening, restart recognition (e.g., after a pause)
-                    try {
-                        recognition.start();
-                        speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
-                    } catch (error) {
-                        speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
-                        console.error('Error restarting recognition:', error);
-                        stopRecognition();
-                    }
-                } else {
-                    speechStatusElem.textContent = 'Speech recognition stopped.';
-                    updateButtonStates();
-                }
-            };
 
             const startRecognition = () => {
                 isListening = true;
                 speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
-                speechOutputElem.textContent = 'Listening...'; // Clear previous text
+                speechOutputElem.textContent = ''; // Clear previous text
                 finalTranscriptContent = ''; // Clear stored content
                 updateButtonStates();
                 try {
+                    initializeRecognition();
                     recognition.start();
                 } catch (error) {
                     speechStatusElem.textContent = 'Error starting recognition: ' + error.message;
@@ -499,7 +511,7 @@
             const stopRecognition = () => {
                 isListening = false;
                 if (recognition) {
-                    recognition.stop(); // This will trigger onend event
+                    recognition.stop();
                 }
                 speechStatusElem.textContent = 'Ready to listen.';
                 updateButtonStates();
@@ -509,16 +521,16 @@
                 if (isListening) {
                     stopRecognition();
                 } else {
-                    // Request microphone permission explicitly before starting recognition
+                    // Request microphone permission
                     navigator.mediaDevices.getUserMedia({ audio: true })
                         .then(() => {
                             startRecognition();
                         })
                         .catch(err => {
-                            speechStatusElem.textContent = 'Microphone access denied. Please allow microphone access in your browser settings.';
+                            speechStatusElem.textContent = 'Microphone access denied. Please allow microphone access in your browser settings and reload the page.';
                             console.error('Microphone access error:', err);
-                            // Disable button if permission denied
                             toggleListeningBtn.disabled = true;
+                            speechLangSelect.disabled = true;
                         });
                 }
             });
@@ -533,10 +545,10 @@
             });
 
         } else {
-            speechOutputElem.textContent = 'Sorry, your browser does not support the Web Speech API.';
+            speechOutputElem.textContent = 'Sorry, your browser does not support the Web Speech API. Please use Chrome or Edge.';
             toggleListeningBtn.disabled = true;
-            speechStatusElem.textContent = 'Browser not supported.';
             speechLangSelect.disabled = true;
+            speechStatusElem.textContent = 'Browser not supported.';
         }
 
         // --- Text Summarizer Functions ---
