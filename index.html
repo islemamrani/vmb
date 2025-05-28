@@ -128,14 +128,10 @@
                 <option value="hi-IN">Hindi (India)</option>
             </select>
         </div>
-        <div id="speechOutput" class="text-gray-800">Input lecture speech...</div>
+        <div id="speechOutput" class="text-gray-800">Speak to see your text here...</div>
         <div class="flex flex-col sm:flex-row gap-4">
-            <button id="toggleListeningBtn" class="btn-pink flex-1">
-                Start Listening
-            </button>
-            <button id="downloadTranscribedTextBtn" class="btn-pink flex-1" disabled>
-                Download Transcribed Text
-            </button>
+            <button id="toggleListeningBtn" class="btn-pink flex-1">Start Listening</button>
+            <button id="downloadTranscribedTextBtn" class="btn-pink flex-1" disabled>Download Transcribed Text</button>
         </div>
         <p id="speechStatus" class="text-sm text-gray-600 mt-4"></p>
         <p class="text-xs text-gray-500 mt-2">
@@ -171,12 +167,12 @@
             <div class="flex-1">
                 <label for="source-lang" class="block text-sm font-medium text-gray-700 mb-1">Source Language:</label>
                 <select id="sourceLang" class="w-full">
-                    </select>
+                </select>
             </div>
             <div class="flex-1">
                 <label for="target-lang" class="block text-sm font-medium text-gray-700 mb-1">Target Language:</label>
                 <select id="targetLang" class="w-full">
-                    </select>
+                </select>
             </div>
         </div>
         <textarea
@@ -396,87 +392,76 @@
 
         // --- Speech Recognition Functions ---
 
-        // Check for Web Speech API support
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;       // Keep listening until stopped
-            recognition.interimResults = true;   // Show live, interim results
-            recognition.lang = speechLangSelect.value; // Set initial language from dropdown
+        // Check if Web Speech API is available
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = speechLangSelect.value;
 
-            // Initialize recognition with current language
-            const initializeRecognition = () => {
-                recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = speechLangSelect.value;
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                finalTranscriptContent = '';
 
-                recognition.onresult = function(event) {
-                    let interimTranscript = '';
-                    finalTranscriptContent = ''; // Reset for final transcript
-
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const transcript = event.results[i][0].transcript;
-                        if (event.results[i].isFinal) {
-                            finalTranscriptContent += transcript + ' ';
-                        } else {
-                            interimTranscript += transcript;
-                        }
-                    }
-                    speechOutputElem.innerHTML = finalTranscriptContent + '<i style="color: gray;">' + interimTranscript + '</i>';
-                    downloadTranscribedTextBtn.disabled = !finalTranscriptContent; // Enable download button
-                };
-
-                recognition.onerror = function(event) {
-                    let errorMessage = '';
-                    switch (event.error) {
-                        case 'no-speech':
-                            errorMessage = 'No speech detected. Please try speaking again.';
-                            break;
-                        case 'audio-capture':
-                            errorMessage = 'Microphone not detected. Ensure your microphone is connected.';
-                            break;
-                        case 'not-allowed':
-                            errorMessage = 'Microphone access denied. Please allow access in browser settings.';
-                            break;
-                        case 'service-not-allowed':
-                            errorMessage = 'Speech recognition service not allowed. Check browser permissions.';
-                            break;
-                        case 'network':
-                            errorMessage = 'Network error. Please check your internet connection.';
-                            break;
-                        default:
-                            errorMessage = `Speech recognition error: ${event.error}`;
-                    }
-                    speechStatusElem.textContent = 'Error: ' + errorMessage;
-                    console.error('Speech recognition error:', event.error);
-                    stopRecognition();
-                };
-
-                recognition.onend = function() {
-                    if (isListening) {
-                        // Restart recognition if still meant to be listening
-                        try {
-                            recognition.start();
-                            speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
-                        } catch (error) {
-                            speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
-                            console.error('Error restarting recognition:', error);
-                            stopRecognition();
-                        }
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscriptContent += transcript + ' ';
                     } else {
-                        speechStatusElem.textContent = 'Speech recognition stopped.';
-                        updateButtonStates();
+                        interimTranscript += transcript;
                     }
-                };
+                }
+
+                speechOutputElem.innerHTML = finalTranscriptContent + '<i style="color: gray;">' + interimTranscript + '</i>';
+                downloadTranscribedTextBtn.disabled = !finalTranscriptContent;
             };
 
-            // Update language when selection changes
+            recognition.onerror = function(event) {
+                let errorMessage = '';
+                switch (event.error) {
+                    case 'no-speech':
+                        errorMessage = 'No speech detected. Please try speaking again.';
+                        break;
+                    case 'audio-capture':
+                        errorMessage = 'Microphone not detected. Please ensure your microphone is connected and enabled.';
+                        break;
+                    case 'not-allowed':
+                        errorMessage = 'Microphone access denied. Please allow microphone access in your browser settings.';
+                        break;
+                    case 'service-not-allowed':
+                        errorMessage = 'Speech recognition service not allowed. Check browser permissions.';
+                        break;
+                    case 'network':
+                        errorMessage = 'Network error. Please check your internet connection.';
+                        break;
+                    default:
+                        errorMessage = `Speech recognition error: ${event.error}`;
+                }
+                speechStatusElem.textContent = errorMessage;
+                console.error('Speech recognition error:', event.error);
+                stopRecognition();
+            };
+
+            recognition.onend = function() {
+                if (isListening) {
+                    try {
+                        recognition.start();
+                        speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
+                    } catch (error) {
+                        speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
+                        stopRecognition();
+                    }
+                } else {
+                    speechStatusElem.textContent = 'Speech recognition stopped.';
+                    updateButtonStates();
+                }
+            };
+
             speechLangSelect.addEventListener('change', () => {
+                recognition.lang = speechLangSelect.value;
                 if (isListening) {
                     recognition.stop();
                     setTimeout(() => {
-                        initializeRecognition();
                         try {
                             recognition.start();
                             speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
@@ -485,55 +470,49 @@
                             console.error('Error restarting recognition:', error);
                             stopRecognition();
                         }
-                    }, 200); // Delay to ensure stop completes
+                    }, 200);
                 } else {
-                    recognition.lang = speechLangSelect.value;
                     speechStatusElem.textContent = `Language set to ${speechLangSelect.options[speechLangSelect.selectedIndex].text}`;
                 }
             });
-
-            const startRecognition = () => {
-                isListening = true;
-                speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
-                speechOutputElem.textContent = ''; // Clear previous text
-                finalTranscriptContent = ''; // Clear stored content
-                updateButtonStates();
-                try {
-                    initializeRecognition();
-                    recognition.start();
-                } catch (error) {
-                    speechStatusElem.textContent = 'Error starting recognition: ' + error.message;
-                    console.error('Error starting recognition:', error);
-                    stopRecognition();
-                }
-            };
-
-            const stopRecognition = () => {
-                isListening = false;
-                if (recognition) {
-                    recognition.stop();
-                }
-                speechStatusElem.textContent = 'Ready to listen.';
-                updateButtonStates();
-            };
 
             toggleListeningBtn.addEventListener('click', function() {
                 if (isListening) {
                     stopRecognition();
                 } else {
-                    // Request microphone permission
                     navigator.mediaDevices.getUserMedia({ audio: true })
                         .then(() => {
                             startRecognition();
                         })
                         .catch(err => {
-                            speechStatusElem.textContent = 'Microphone access denied. Please allow microphone access in your browser settings and reload the page.';
+                            speechStatusElem.textContent = 'Microphone access denied. Please allow microphone access in your browser settings.';
                             console.error('Microphone access error:', err);
                             toggleListeningBtn.disabled = true;
                             speechLangSelect.disabled = true;
                         });
                 }
             });
+
+            function startRecognition() {
+                isListening = true;
+                speechOutputElem.textContent = 'Listening...';
+                speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
+                finalTranscriptContent = '';
+                updateButtonStates();
+                try {
+                    recognition.start();
+                } catch (error) {
+                    speechStatusElem.textContent = 'Error starting recognition: ' + error.message;
+                    console.error('Error starting recognition:', error);
+                    stopRecognition();
+                }
+            }
+
+            function stopRecognition() {
+                isListening = false;
+                recognition.stop();
+                updateButtonStates();
+            }
 
             downloadTranscribedTextBtn.addEventListener('click', function() {
                 if (finalTranscriptContent) {
