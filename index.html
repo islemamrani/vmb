@@ -117,7 +117,18 @@
 
     <section class="card">
         <h2 class="text-2xl font-bold text-gray-700 mb-4">🎤 Lecture Transcription (Voice to Text)</h2>
-        <div id="speechOutput" class="text-gray-800">Input lecture speech..</div>
+        <div class="mb-4">
+            <label for="speechLang" class="block text-sm font-medium text-gray-700 mb-1">Recognition Language:</label>
+            <select id="speechLang" class="w-full">
+                <option value="en-US">English (US)</option>
+                <option value="es-ES">Spanish (Spain)</option>
+                <option value="fr-FR">French (France)</option>
+                <option value="de-DE">German (Germany)</option>
+                <option value="zh-CN">Chinese (Mandarin)</option>
+                <option value="hi-IN">Hindi (India)</option>
+            </select>
+        </div>
+        <div id="speechOutput" class="text-gray-800">Input lecture speech...</div>
         <div class="flex flex-col sm:flex-row gap-4">
             <button id="toggleListeningBtn" class="btn-pink flex-1">
                 Start Listening
@@ -316,6 +327,7 @@
         const speechOutputElem = document.getElementById('speechOutput');
         const speechStatusElem = document.getElementById('speechStatus');
         const downloadTranscribedTextBtn = document.getElementById('downloadTranscribedTextBtn');
+        const speechLangSelect = document.getElementById('speechLang');
 
         const summaryInput = document.getElementById('summaryInput');
         const summarizeButton = document.getElementById('summarizeButton');
@@ -389,7 +401,26 @@
             recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
             recognition.continuous = true;       // Keep listening even if user pauses
             recognition.interimResults = true;   // Show live, interim results
-            recognition.lang = 'en-US';          // Default language
+            recognition.lang = speechLangSelect.value; // Set initial language from dropdown
+
+            // Update language when selection changes
+            speechLangSelect.addEventListener('change', () => {
+                recognition.lang = speechLangSelect.value;
+                if (isListening) {
+                    // Restart recognition with new language
+                    recognition.stop();
+                    setTimeout(() => {
+                        try {
+                            recognition.start();
+                            speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
+                        } catch (error) {
+                            speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
+                            console.error('Error restarting recognition:', error);
+                            stopRecognition();
+                        }
+                    }, 200); // Small delay to ensure stop completes
+                }
+            });
 
             recognition.onresult = function(event) {
                 let interimTranscript = '';
@@ -438,7 +469,7 @@
                     // If still meant to be listening, restart recognition (e.g., after a pause)
                     try {
                         recognition.start();
-                        speechStatusElem.textContent = 'Listening (restarted)...';
+                        speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
                     } catch (error) {
                         speechStatusElem.textContent = 'Error restarting recognition: ' + error.message;
                         console.error('Error restarting recognition:', error);
@@ -452,7 +483,7 @@
 
             const startRecognition = () => {
                 isListening = true;
-                speechStatusElem.textContent = 'Listening...';
+                speechStatusElem.textContent = `Listening in ${speechLangSelect.options[speechLangSelect.selectedIndex].text}...`;
                 speechOutputElem.textContent = 'Listening...'; // Clear previous text
                 finalTranscriptContent = ''; // Clear stored content
                 updateButtonStates();
@@ -505,8 +536,8 @@
             speechOutputElem.textContent = 'Sorry, your browser does not support the Web Speech API.';
             toggleListeningBtn.disabled = true;
             speechStatusElem.textContent = 'Browser not supported.';
+            speechLangSelect.disabled = true;
         }
-
 
         // --- Text Summarizer Functions ---
 
